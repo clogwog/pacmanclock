@@ -64,44 +64,60 @@ static bool g_corridor[PANEL][PANEL];
 static int cell_cx(int i) { return OFF + CELL * i; }
 static int cell_cy(int j) { return OFF + CELL * j; }
 
-// Maze layout — pacman-style with loops, branches and dead ends.
-//
-//    0   1   2   3   4
-//   (0,0)─(1,0)─(2,0)─(3,0)─(4,0)
-//    │     │           │     │
-//   (0,1) (1,1)─(2,1)─(3,1) (4,1)
-//    │                 │     │           (note: (2,1)-(2,2) vertical)
-//   (0,2)─(1,2)       (2,2) (3,2)─(4,2)
-//    │                 │     │           dead ends: (1,2) (3,2)
-//   (0,3) (1,3)─(2,3)─(3,3) (4,3)
-//    │     │                 │           dead ends: (1,3) (3,3)
-//   (0,4)─(1,4)─(2,4)─(3,4)─(4,4)
-//
-static void BuildMazeGraph()
+// Randomised DFS spanning tree + extra random edges for loops/cross-connections.
+// Every call produces a new connected maze with dead ends.
+static void GenerateRandomMaze()
 {
     memset(hConn, 0, sizeof(hConn));
     memset(vConn, 0, sizeof(vConn));
 
-    // top row: fully connected horizontally
-    hConn[0][0] = hConn[1][0] = hConn[2][0] = hConn[3][0] = true;
-    // middle row stub
-    hConn[1][1] = hConn[2][1] = true;
-    // row 2 side stubs (left + right)
-    hConn[0][2] = hConn[3][2] = true;
-    // row 3 middle stub
-    hConn[1][3] = hConn[2][3] = true;
-    // bottom row fully connected
-    hConn[0][4] = hConn[1][4] = hConn[2][4] = hConn[3][4] = true;
+    bool visited[GRID][GRID];
+    memset(visited, 0, sizeof(visited));
 
-    // left + right columns fully connected
-    vConn[0][0] = vConn[0][1] = vConn[0][2] = vConn[0][3] = true;
-    vConn[4][0] = vConn[4][1] = vConn[4][2] = vConn[4][3] = true;
-    // column 1: top and bottom stubs only
-    vConn[1][0] = vConn[1][3] = true;
-    // column 2: centre vertical (creates spurs (2,1)<->(2,2)<->(2,3))
-    vConn[2][1] = vConn[2][2] = true;
-    // column 3: top and bottom stubs only
-    vConn[3][0] = vConn[3][3] = true;
+    struct Cell { int i, j; };
+    vector<Cell> stack;
+    int si = rand() % GRID;
+    int sj = rand() % GRID;
+    visited[si][sj] = true;
+    stack.push_back({si, sj});
+
+    while (!stack.empty())
+    {
+        int i = stack.back().i;
+        int j = stack.back().j;
+
+        struct Move { int di, dj; };
+        Move opts[4];
+        int n = 0;
+        if (i > 0        && !visited[i-1][j]) opts[n++] = {-1,  0};
+        if (i < GRID - 1 && !visited[i+1][j]) opts[n++] = { 1,  0};
+        if (j > 0        && !visited[i][j-1]) opts[n++] = { 0, -1};
+        if (j < GRID - 1 && !visited[i][j+1]) opts[n++] = { 0,  1};
+
+        if (n == 0) { stack.pop_back(); continue; }
+
+        Move m = opts[rand() % n];
+        int ni = i + m.di;
+        int nj = j + m.dj;
+
+        if      (m.di ==  1) hConn[i ][j ] = true;
+        else if (m.di == -1) hConn[ni][nj] = true;
+        else if (m.dj ==  1) vConn[i ][j ] = true;
+        else                 vConn[ni][nj] = true;
+
+        visited[ni][nj] = true;
+        stack.push_back({ni, nj});
+    }
+
+    // Extra edges (~25% chance) — adds loops + cross connections on top of the
+    // spanning tree, so the maze still has dead ends but isn't a tree.
+    for (int i = 0; i < GRID - 1; ++i)
+        for (int j = 0; j < GRID; ++j)
+            if (!hConn[i][j] && (rand() % 100) < 25) hConn[i][j] = true;
+
+    for (int i = 0; i < GRID; ++i)
+        for (int j = 0; j < GRID - 1; ++j)
+            if (!vConn[i][j] && (rand() % 100) < 25) vConn[i][j] = true;
 }
 
 static void BuildCorridorMask()
@@ -212,11 +228,6 @@ static bool AnyPelletLeft()
     return false;
 }
 
-static void RegeneratePellets()
-{
-    for (auto& p : g_pellets) p.eaten = false;
-}
-
 // ---------------------------------------------------------------------------
 // Pacman — 5x5 sprite with chomping mouth, wanders maze with no-backtrack.
 // ---------------------------------------------------------------------------
@@ -225,10 +236,16 @@ class Pacman
 public:
     Pacman()
     {
+        reset();
+    }
+
+    void reset()
+    {
         ci = 0; cj = 0;
-        dx = 1; dy = 0;
+        dx = 0; dy = 0;
         progress = 0;
         frame = 0;
+        pick_direction();   // pick any valid first direction
     }
 
     void step()
@@ -238,14 +255,12 @@ public:
 
         if (progress >= CELL)
         {
-            // arrived at next cell
             ci += dx;
             cj += dy;
             progress = 0;
             pick_direction();
         }
 
-        // eat any pellets we now overlap
         int cx_px = cell_cx(ci) + dx * progress;
         int cy_px = cell_cy(cj) + dy * progress;
         for (auto& p : g_pellets)
@@ -254,9 +269,6 @@ public:
             if (abs(p.x - cx_px) <= 1 && abs(p.y - cy_px) <= 1)
                 p.eaten = true;
         }
-
-        if (!AnyPelletLeft())
-            RegeneratePellets();
     }
 
     void render(Canvas* c) const
@@ -422,12 +434,13 @@ int main(int argc, char* argv[])
     opts.chain_length = 1;
     opts.parallel = 1;
     opts.disable_hardware_pulsing = true;
+    opts.brightness = 50;                   // half strength
     Canvas* canvas = new RGBMatrix(&io, opts);
 
     signal(SIGTERM, InterruptHandler);
     signal(SIGINT,  InterruptHandler);
 
-    BuildMazeGraph();
+    GenerateRandomMaze();
     BuildCorridorMask();
     BuildPellets();
 
@@ -462,6 +475,13 @@ int main(int argc, char* argv[])
         {
             pac.step();
             pac_tick = 0;
+            if (!AnyPelletLeft())
+            {
+                GenerateRandomMaze();
+                BuildCorridorMask();
+                BuildPellets();
+                pac.reset();
+            }
         }
         pac.render(canvas);
 
