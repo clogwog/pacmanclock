@@ -514,8 +514,11 @@ int main(int argc, char* argv[])
     Pacman pac;
 
     time_t start_t = time(0);
-    int    pac_tick = 0;
-    const int PAC_STEP_FRAMES = 4;   // ~60Hz / 4 = ~15 pixels/sec
+    // Wall-clock pacing — refresh rate varies on the LED matrix, so frame
+    // counts can't drive game speed. ~80ms/step ≈ 12 pixels per second.
+    static const long PAC_STEP_US = 80 * 1000;
+    struct timeval last_step;
+    gettimeofday(&last_step, NULL);
 
     bool cont = true;
     while (cont)
@@ -538,10 +541,14 @@ int main(int argc, char* argv[])
         DrawWalls(offscreen);
         DrawPellets(offscreen);
 
-        if (++pac_tick >= PAC_STEP_FRAMES)
+        struct timeval now_tv;
+        gettimeofday(&now_tv, NULL);
+        long elapsed_us = (now_tv.tv_sec  - last_step.tv_sec)  * 1000000L
+                        + (now_tv.tv_usec - last_step.tv_usec);
+        if (elapsed_us >= PAC_STEP_US)
         {
             pac.step();
-            pac_tick = 0;
+            last_step = now_tv;
             if (!AnyPelletLeft())
             {
                 GenerateRandomMaze();
