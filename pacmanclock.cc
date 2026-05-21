@@ -21,6 +21,7 @@ using namespace std;
 using rgb_matrix::GPIO;
 using rgb_matrix::RGBMatrix;
 using rgb_matrix::Canvas;
+using rgb_matrix::FrameCanvas;
 
 static const int PANEL = 32;
 
@@ -227,10 +228,13 @@ static void DrawPellets(Canvas* c)
         if (p.eaten) continue;
         if (p.power)
         {
-            // 4x4 power pellet centred on cell centre (occupies cx-1..cx+2)
-            for (int dy = -1; dy <= 2; ++dy)
-                for (int dx = -1; dx <= 2; ++dx)
-                    c->SetPixel(p.x + dx, p.y + dy, PELL_R, PELL_G, PELL_B);
+            // 2x2 power pellet, biased toward the maze corner it sits in
+            int bx = (p.x < PANEL / 2) ? -1 : 0;
+            int by = (p.y < PANEL / 2) ? -1 : 0;
+            for (int dy = 0; dy < 2; ++dy)
+                for (int dx = 0; dx < 2; ++dx)
+                    c->SetPixel(p.x + bx + dx, p.y + by + dy,
+                                PELL_R, PELL_G, PELL_B);
         }
         else
         {
@@ -497,7 +501,8 @@ int main(int argc, char* argv[])
     opts.parallel = 1;
     opts.disable_hardware_pulsing = true;
     opts.brightness = 50;                   // half strength
-    Canvas* canvas = new RGBMatrix(&io, opts);
+    RGBMatrix*   matrix    = new RGBMatrix(&io, opts);
+    FrameCanvas* offscreen = matrix->CreateFrameCanvas();
 
     signal(SIGTERM, InterruptHandler);
     signal(SIGINT,  InterruptHandler);
@@ -529,9 +534,9 @@ int main(int argc, char* argv[])
         g_m10.update(now->tm_min  / 10);
         g_m1 .update(now->tm_min  % 10);
 
-        canvas->Clear();
-        DrawWalls(canvas);
-        DrawPellets(canvas);
+        offscreen->Clear();
+        DrawWalls(offscreen);
+        DrawPellets(offscreen);
 
         if (++pac_tick >= PAC_STEP_FRAMES)
         {
@@ -546,17 +551,18 @@ int main(int argc, char* argv[])
             }
         }
 
-        DrawDigits(canvas);     // time over maze + pellets
-        pac.render(canvas);     // pacman on top of everything
+        DrawDigits(offscreen);     // time over maze + pellets
+        pac.render(offscreen);     // pacman on top of everything
 
-        usleep(16000);
+        // Atomic flip on the next vsync — no flicker.
+        offscreen = matrix->SwapOnVSync(offscreen);
         if (interrupt_received)
             cont = false;
     }
 
     syslog(LOG_NOTICE, "end of pacmanclock");
 
-    canvas->Clear();
-    delete canvas;
+    matrix->Clear();
+    delete matrix;
     return 0;
 }
