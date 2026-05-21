@@ -199,6 +199,7 @@ int main(int argc, char* argv[])
     srand((unsigned int)time(NULL));
 
     RGBMatrix::Options opts;
+    opts.hardware_mapping = "adafruit-hat"; // Adafruit RGB Matrix HAT pinout
     opts.rows = 32;
     opts.chain_length = 1;
     opts.parallel = 1;
