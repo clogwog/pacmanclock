@@ -1,109 +1,86 @@
 #include "digit.h"
 
-#define DW 5
-#define DH 7
-
 #define __ false
 #define XX true
 
-static bool zero[DH][DW] = {
-    XX,XX,XX,XX,XX,
-    XX,__,__,__,XX,
-    XX,__,__,__,XX,
-    XX,__,__,__,XX,
-    XX,__,__,__,XX,
-    XX,__,__,__,XX,
-    XX,XX,XX,XX,XX
+static bool zero[DIGIT_HT][DIGIT_W] = {
+    XX,XX,XX,
+    XX,__,XX,
+    XX,__,XX,
+    XX,__,XX,
+    XX,XX,XX
 };
 
-static bool one[DH][DW] = {
-    __,__,XX,__,__,
-    __,XX,XX,__,__,
-    __,__,XX,__,__,
-    __,__,XX,__,__,
-    __,__,XX,__,__,
-    __,__,XX,__,__,
-    __,XX,XX,XX,__
+static bool one[DIGIT_HT][DIGIT_W] = {
+    XX,XX,__,
+    __,XX,__,
+    __,XX,__,
+    __,XX,__,
+    XX,XX,XX
 };
 
-static bool two[DH][DW] = {
-    XX,XX,XX,XX,XX,
-    __,__,__,__,XX,
-    __,__,__,__,XX,
-    XX,XX,XX,XX,XX,
-    XX,__,__,__,__,
-    XX,__,__,__,__,
-    XX,XX,XX,XX,XX
+static bool two[DIGIT_HT][DIGIT_W] = {
+    XX,XX,XX,
+    __,__,XX,
+    XX,XX,XX,
+    XX,__,__,
+    XX,XX,XX
 };
 
-static bool three[DH][DW] = {
-    XX,XX,XX,XX,XX,
-    __,__,__,__,XX,
-    __,__,__,__,XX,
-    XX,XX,XX,XX,XX,
-    __,__,__,__,XX,
-    __,__,__,__,XX,
-    XX,XX,XX,XX,XX
+static bool three[DIGIT_HT][DIGIT_W] = {
+    XX,XX,XX,
+    __,__,XX,
+    XX,XX,XX,
+    __,__,XX,
+    XX,XX,XX
 };
 
-static bool four[DH][DW] = {
-    XX,__,__,__,XX,
-    XX,__,__,__,XX,
-    XX,__,__,__,XX,
-    XX,XX,XX,XX,XX,
-    __,__,__,__,XX,
-    __,__,__,__,XX,
-    __,__,__,__,XX
+static bool four[DIGIT_HT][DIGIT_W] = {
+    XX,__,XX,
+    XX,__,XX,
+    XX,XX,XX,
+    __,__,XX,
+    __,__,XX
 };
 
-static bool five[DH][DW] = {
-    XX,XX,XX,XX,XX,
-    XX,__,__,__,__,
-    XX,__,__,__,__,
-    XX,XX,XX,XX,XX,
-    __,__,__,__,XX,
-    __,__,__,__,XX,
-    XX,XX,XX,XX,XX
+static bool five[DIGIT_HT][DIGIT_W] = {
+    XX,XX,XX,
+    XX,__,__,
+    XX,XX,XX,
+    __,__,XX,
+    XX,XX,XX
 };
 
-static bool six[DH][DW] = {
-    XX,XX,XX,XX,XX,
-    XX,__,__,__,__,
-    XX,__,__,__,__,
-    XX,XX,XX,XX,XX,
-    XX,__,__,__,XX,
-    XX,__,__,__,XX,
-    XX,XX,XX,XX,XX
+static bool six[DIGIT_HT][DIGIT_W] = {
+    XX,XX,XX,
+    XX,__,__,
+    XX,XX,XX,
+    XX,__,XX,
+    XX,XX,XX
 };
 
-static bool seven[DH][DW] = {
-    XX,XX,XX,XX,XX,
-    __,__,__,__,XX,
-    __,__,__,__,XX,
-    __,__,__,XX,__,
-    __,__,XX,__,__,
-    __,XX,__,__,__,
-    __,XX,__,__,__
+static bool seven[DIGIT_HT][DIGIT_W] = {
+    XX,XX,XX,
+    __,__,XX,
+    __,XX,__,
+    __,XX,__,
+    __,XX,__
 };
 
-static bool eight[DH][DW] = {
-    XX,XX,XX,XX,XX,
-    XX,__,__,__,XX,
-    XX,__,__,__,XX,
-    XX,XX,XX,XX,XX,
-    XX,__,__,__,XX,
-    XX,__,__,__,XX,
-    XX,XX,XX,XX,XX
+static bool eight[DIGIT_HT][DIGIT_W] = {
+    XX,XX,XX,
+    XX,__,XX,
+    XX,XX,XX,
+    XX,__,XX,
+    XX,XX,XX
 };
 
-static bool nine[DH][DW] = {
-    XX,XX,XX,XX,XX,
-    XX,__,__,__,XX,
-    XX,__,__,__,XX,
-    XX,XX,XX,XX,XX,
-    __,__,__,__,XX,
-    __,__,__,__,XX,
-    XX,XX,XX,XX,XX
+static bool nine[DIGIT_HT][DIGIT_W] = {
+    XX,XX,XX,
+    XX,__,XX,
+    XX,XX,XX,
+    __,__,XX,
+    XX,XX,XX
 };
 
 Digit::Digit(int x, int y)
@@ -123,7 +100,7 @@ bool Digit::hittest(int gx, int gy)
     int lx = gx - x;
     int ly = gy - y;
 
-    if (lx < 0 || ly < 0 || lx >= DW || ly >= DH)
+    if (lx < 0 || ly < 0 || lx >= DIGIT_W || ly >= DIGIT_HT)
         return false;
 
     switch (num)

@@ -1,6 +1,9 @@
 #ifndef DIGIT_H
 #define DIGIT_H
 
+#define DIGIT_W 3
+#define DIGIT_HT 5
+
 class Digit
 {
     public:
