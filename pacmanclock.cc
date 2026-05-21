@@ -36,12 +36,13 @@ static void InterruptHandler(int)
     interrupt_received = true;
 }
 
-// Clock — small 3x5 digits top-left. HH:MM with 1px gaps; total 17px wide.
-static Digit g_h10(1,  1);
-static Digit g_h1 (5,  1);
-static Digit g_m10(11, 1);
-static Digit g_m1 (15, 1);
-static const int COLON_X     = 9;
+// Clock — small 3x5 digits, centred at the top of the panel.
+// HH:MM total width = 17 (3+1+3+1+1+1+3+1+3). Start at x=7 to centre on 32.
+static Digit g_h10(7,  1);
+static Digit g_h1 (11, 1);
+static Digit g_m10(17, 1);
+static Digit g_m1 (21, 1);
+static const int COLON_X     = 15;
 static const int COLON_Y_TOP = 2;
 static const int COLON_Y_BOT = 4;
 
@@ -193,32 +194,49 @@ static void DrawWalls(Canvas* c)
 // ---------------------------------------------------------------------------
 // Pellets — one at each cell centre + one at each connection midpoint.
 // ---------------------------------------------------------------------------
-struct Pellet { int x; int y; bool eaten; };
+struct Pellet { int x; int y; bool eaten; bool power; };
 static vector<Pellet> g_pellets;
 
 static void BuildPellets()
 {
     g_pellets.clear();
     for (int i = 0; i < GRID; ++i)
+    {
         for (int j = 0; j < GRID; ++j)
-            g_pellets.push_back({cell_cx(i), cell_cy(j), false});
+        {
+            bool corner = (i == 0 || i == GRID - 1) && (j == 0 || j == GRID - 1);
+            g_pellets.push_back({cell_cx(i), cell_cy(j), false, corner});
+        }
+    }
 
     for (int i = 0; i < GRID - 1; ++i)
         for (int j = 0; j < GRID; ++j)
             if (hConn[i][j])
-                g_pellets.push_back({cell_cx(i) + 3, cell_cy(j), false});
+                g_pellets.push_back({cell_cx(i) + 3, cell_cy(j), false, false});
 
     for (int i = 0; i < GRID; ++i)
         for (int j = 0; j < GRID - 1; ++j)
             if (vConn[i][j])
-                g_pellets.push_back({cell_cx(i), cell_cy(j) + 3, false});
+                g_pellets.push_back({cell_cx(i), cell_cy(j) + 3, false, false});
 }
 
 static void DrawPellets(Canvas* c)
 {
     for (const auto& p : g_pellets)
-        if (!p.eaten)
+    {
+        if (p.eaten) continue;
+        if (p.power)
+        {
+            // 4x4 power pellet centred on cell centre (occupies cx-1..cx+2)
+            for (int dy = -1; dy <= 2; ++dy)
+                for (int dx = -1; dx <= 2; ++dx)
+                    c->SetPixel(p.x + dx, p.y + dy, PELL_R, PELL_G, PELL_B);
+        }
+        else
+        {
             c->SetPixel(p.x, p.y, PELL_R, PELL_G, PELL_B);
+        }
+    }
 }
 
 static bool AnyPelletLeft()
@@ -241,11 +259,38 @@ public:
 
     void reset()
     {
-        ci = 0; cj = 0;
+        // start as close to the centre cell as possible, but skip any cell
+        // whose 5x5 corridor block isn't fully clear of walls (search outward
+        // in expanding rings until we find a clear one).
+        int t_i = GRID / 2;
+        int t_j = GRID / 2;
+        ci = t_i;
+        cj = t_j;
+        for (int radius = 0; radius < GRID; ++radius)
+        {
+            bool found = false;
+            for (int di = -radius; di <= radius && !found; ++di)
+            {
+                for (int dj = -radius; dj <= radius && !found; ++dj)
+                {
+                    if (std::max(std::abs(di), std::abs(dj)) != radius) continue;
+                    int ni = t_i + di;
+                    int nj = t_j + dj;
+                    if (ni < 0 || ni >= GRID || nj < 0 || nj >= GRID) continue;
+                    if (cell_is_clear(ni, nj))
+                    {
+                        ci = ni;
+                        cj = nj;
+                        found = true;
+                    }
+                }
+            }
+            if (found) break;
+        }
         dx = 0; dy = 0;
         progress = 0;
         frame = 0;
-        pick_direction();   // pick any valid first direction
+        pick_direction();
     }
 
     void step()
@@ -302,6 +347,23 @@ private:
     int dx, dy;        // direction we're heading
     int progress;      // 0..CELL pixels along (dx,dy) from current cell centre
     int frame;
+
+    bool cell_is_clear(int i, int j) const
+    {
+        int cx = cell_cx(i);
+        int cy = cell_cy(j);
+        for (int dy = -2; dy <= 2; ++dy)
+        {
+            for (int dx = -2; dx <= 2; ++dx)
+            {
+                int px = cx + dx;
+                int py = cy + dy;
+                if (px < 0 || px >= PANEL || py < 0 || py >= PANEL) return false;
+                if (!g_corridor[py][px]) return false;
+            }
+        }
+        return true;
+    }
 
     bool exit_exists(int ei, int ej, int edx, int edy) const
     {
@@ -483,9 +545,9 @@ int main(int argc, char* argv[])
                 pac.reset();
             }
         }
-        pac.render(canvas);
 
-        DrawDigits(canvas);     // time on top of everything
+        DrawDigits(canvas);     // time over maze + pellets
+        pac.render(canvas);     // pacman on top of everything
 
         usleep(16000);
         if (interrupt_received)
