@@ -5,10 +5,14 @@ BINARIES=pacmanclock
 # library in lib
 RGB_INCDIR=include
 RGB_LIBDIR=lib
-LDFLAGS+=-L$(RGB_LIBDIR) -lrgbmatrix -lrt -lm -lpthread
+RGB_LIBRARY_NAME=rgbmatrix
+RGB_LIBRARY=$(RGB_LIBDIR)/lib$(RGB_LIBRARY_NAME).a
+LDFLAGS+=-L$(RGB_LIBDIR) -l$(RGB_LIBRARY_NAME) -lrt -lm -lpthread
 
 all : $(BINARIES)
 
+$(RGB_LIBRARY):
+	$(MAKE) -C $(RGB_LIBDIR)
 
 pacmanclock : pacmanclock.o digit.o $(RGB_LIBRARY)
 	$(CXX) $(CXXFLAGS) pacmanclock.o digit.o -o $@ $(LDFLAGS)
@@ -19,3 +23,4 @@ pacmanclock : pacmanclock.o digit.o $(RGB_LIBRARY)
 
 clean:
 	rm -f *.o $(OBJECTS) $(BINARIES)
+	$(MAKE) -C $(RGB_LIBDIR) clean
