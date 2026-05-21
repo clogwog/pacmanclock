@@ -198,7 +198,12 @@ int main(int argc, char* argv[])
 
     srand((unsigned int)time(NULL));
 
-    Canvas* canvas = new RGBMatrix(&io, 32, 1);
+    RGBMatrix::Options opts;
+    opts.rows = 32;
+    opts.chain_length = 1;
+    opts.parallel = 1;
+    opts.disable_hardware_pulsing = true;   // Pi sound module compat (more flicker)
+    Canvas* canvas = new RGBMatrix(&io, opts);
 
     signal(SIGTERM, InterruptHandler);
     signal(SIGINT,  InterruptHandler);
