@@ -203,7 +203,7 @@ static vector<Pellet> g_pellets;
 // the remaining pellets cycle through all hues, then settle back to normal.
 static bool          g_flash_active = false;
 static struct timeval g_flash_start;
-static const long    FLASH_DURATION_US = 700 * 1000;   // 0.7s burst
+static const long    FLASH_DURATION_US = 350 * 1000;   // 0.35s burst
 
 static void TriggerFlash()
 {
@@ -256,9 +256,9 @@ static void BuildPellets()
 
 static void DrawPellets(Canvas* c)
 {
-    // During a flash, all remaining pellets share a hue that spins through the
-    // full colour wheel a few times, with a per-pellet offset so the rainbow
-    // ripples across the maze. Once the burst ends, pellets return to normal.
+    // During a flash, every remaining pellet shares one hue that spins through
+    // the full colour wheel, so all dots change colour together. Once the burst
+    // ends, pellets return to normal.
     bool  rainbow   = false;
     float flash_hue = 0.0f;
     if (g_flash_active)
@@ -276,21 +276,28 @@ static void DrawPellets(Canvas* c)
         }
     }
 
-    float hue_step = g_pellets.empty() ? 0.0f : 360.0f / g_pellets.size();
+    uint8_t fr = PELL_R, fg = PELL_G, fb = PELL_B;
+    if (rainbow)
+        HsvToRgb(flash_hue, 1.0f, 1.0f, fr, fg, fb);
 
-    int idx = 0;
     for (const auto& p : g_pellets)
     {
-        ++idx;
         if (p.eaten) continue;
 
-        uint8_t pr = PELL_R, pg = PELL_G, pb = PELL_B;
-        if (rainbow)
-            HsvToRgb(flash_hue + idx * hue_step, 1.0f, 1.0f, pr, pg, pb);
+        uint8_t pr = fr, pg = fg, pb = fb;
 
         if (p.power)
         {
             // 2x2 power pellet, biased toward the maze corner it sits in
+            int bx = (p.x < PANEL / 2) ? -1 : 0;
+            int by = (p.y < PANEL / 2) ? -1 : 0;
+            for (int dy = 0; dy < 2; ++dy)
+                for (int dx = 0; dx < 2; ++dx)
+                    c->SetPixel(p.x + bx + dx, p.y + by + dy, pr, pg, pb);
+        }
+        else if (rainbow)
+        {
+            // bulk normal dots up to 2x2 during the flash so they read brighter
             int bx = (p.x < PANEL / 2) ? -1 : 0;
             int by = (p.y < PANEL / 2) ? -1 : 0;
             for (int dy = 0; dy < 2; ++dy)
