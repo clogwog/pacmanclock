@@ -13,6 +13,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <cmath>
 
 #include "digit.h"
 
@@ -198,6 +199,38 @@ static void DrawWalls(Canvas* c)
 struct Pellet { int x; int y; bool eaten; bool power; };
 static vector<Pellet> g_pellets;
 
+// Rainbow flash — triggered when pacman eats a power pellet. For the duration
+// the remaining pellets cycle through all hues, then settle back to normal.
+static bool          g_flash_active = false;
+static struct timeval g_flash_start;
+static const long    FLASH_DURATION_US = 700 * 1000;   // 0.7s burst
+
+static void TriggerFlash()
+{
+    g_flash_active = true;
+    gettimeofday(&g_flash_start, NULL);
+}
+
+// h in [0,360), s,v in [0,1] -> 0..255 rgb.
+static void HsvToRgb(float h, float s, float v, uint8_t& r, uint8_t& g, uint8_t& b)
+{
+    h = fmodf(h, 360.0f);
+    if (h < 0) h += 360.0f;
+    float c = v * s;
+    float x = c * (1.0f - fabsf(fmodf(h / 60.0f, 2.0f) - 1.0f));
+    float m = v - c;
+    float rf = 0, gf = 0, bf = 0;
+    if      (h <  60) { rf = c; gf = x; }
+    else if (h < 120) { rf = x; gf = c; }
+    else if (h < 180) { gf = c; bf = x; }
+    else if (h < 240) { gf = x; bf = c; }
+    else if (h < 300) { rf = x; bf = c; }
+    else              { rf = c; bf = x; }
+    r = (uint8_t)((rf + m) * 255.0f);
+    g = (uint8_t)((gf + m) * 255.0f);
+    b = (uint8_t)((bf + m) * 255.0f);
+}
+
 static void BuildPellets()
 {
     g_pellets.clear();
@@ -223,9 +256,36 @@ static void BuildPellets()
 
 static void DrawPellets(Canvas* c)
 {
+    // During a flash, all remaining pellets share a hue that spins through the
+    // full colour wheel a few times, with a per-pellet offset so the rainbow
+    // ripples across the maze. Once the burst ends, pellets return to normal.
+    bool  rainbow   = false;
+    float flash_hue = 0.0f;
+    if (g_flash_active)
+    {
+        struct timeval now;
+        gettimeofday(&now, NULL);
+        long el = (now.tv_sec  - g_flash_start.tv_sec)  * 1000000L
+                + (now.tv_usec - g_flash_start.tv_usec);
+        if (el >= FLASH_DURATION_US)
+            g_flash_active = false;
+        else
+        {
+            rainbow   = true;
+            flash_hue = (float)el / FLASH_DURATION_US * 360.0f * 3.0f;   // 3 spins
+        }
+    }
+
+    int idx = 0;
     for (const auto& p : g_pellets)
     {
+        ++idx;
         if (p.eaten) continue;
+
+        uint8_t pr = PELL_R, pg = PELL_G, pb = PELL_B;
+        if (rainbow)
+            HsvToRgb(flash_hue + idx * 24.0f, 1.0f, 1.0f, pr, pg, pb);
+
         if (p.power)
         {
             // 2x2 power pellet, biased toward the maze corner it sits in
@@ -233,12 +293,11 @@ static void DrawPellets(Canvas* c)
             int by = (p.y < PANEL / 2) ? -1 : 0;
             for (int dy = 0; dy < 2; ++dy)
                 for (int dx = 0; dx < 2; ++dx)
-                    c->SetPixel(p.x + bx + dx, p.y + by + dy,
-                                PELL_R, PELL_G, PELL_B);
+                    c->SetPixel(p.x + bx + dx, p.y + by + dy, pr, pg, pb);
         }
         else
         {
-            c->SetPixel(p.x, p.y, PELL_R, PELL_G, PELL_B);
+            c->SetPixel(p.x, p.y, pr, pg, pb);
         }
     }
 }
@@ -316,7 +375,11 @@ public:
         {
             if (p.eaten) continue;
             if (abs(p.x - cx_px) <= 1 && abs(p.y - cy_px) <= 1)
+            {
                 p.eaten = true;
+                if (p.power)
+                    TriggerFlash();
+            }
         }
     }
 
