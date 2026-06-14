@@ -272,9 +272,11 @@ static void DrawPellets(Canvas* c)
         else
         {
             rainbow   = true;
-            flash_hue = (float)el / FLASH_DURATION_US * 360.0f * 3.0f;   // 3 spins
+            flash_hue = (float)el / FLASH_DURATION_US * 360.0f;   // one full spin
         }
     }
+
+    float hue_step = g_pellets.empty() ? 0.0f : 360.0f / g_pellets.size();
 
     int idx = 0;
     for (const auto& p : g_pellets)
@@ -284,7 +286,7 @@ static void DrawPellets(Canvas* c)
 
         uint8_t pr = PELL_R, pg = PELL_G, pb = PELL_B;
         if (rainbow)
-            HsvToRgb(flash_hue + idx * 24.0f, 1.0f, 1.0f, pr, pg, pb);
+            HsvToRgb(flash_hue + idx * hue_step, 1.0f, 1.0f, pr, pg, pb);
 
         if (p.power)
         {
