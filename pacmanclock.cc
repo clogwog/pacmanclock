@@ -295,15 +295,6 @@ static void DrawPellets(Canvas* c)
                 for (int dx = 0; dx < 2; ++dx)
                     c->SetPixel(p.x + bx + dx, p.y + by + dy, pr, pg, pb);
         }
-        else if (rainbow)
-        {
-            // bulk normal dots up to 2x2 during the flash so they read brighter
-            int bx = (p.x < PANEL / 2) ? -1 : 0;
-            int by = (p.y < PANEL / 2) ? -1 : 0;
-            for (int dy = 0; dy < 2; ++dy)
-                for (int dx = 0; dx < 2; ++dx)
-                    c->SetPixel(p.x + bx + dx, p.y + by + dy, pr, pg, pb);
-        }
         else
         {
             c->SetPixel(p.x, p.y, pr, pg, pb);
