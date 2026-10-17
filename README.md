@@ -7,6 +7,8 @@ the top and a 5x5 pacman sprite that wanders the corridors eating pellets.
 The four corner cells get 2x2 power pellets. When every pellet has been eaten
 a fresh maze is generated and pacman starts again from the centre cell.
 
+[Demo](https://clogwog.net/projects/panel-player/?project=pacmanclock)
+
 Build:
 
     make -C lib HARDWARE_DESC=adafruit-hat    # builds librgbmatrix.a (once)
